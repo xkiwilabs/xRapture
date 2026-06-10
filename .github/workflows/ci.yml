@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    name: ${{ matrix.os }} / py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Linux needs PortAudio (for sounddevice) and Tk system libs; macOS and
+      # Windows get both bundled with the Python build.
+      - name: Install Linux system libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2 python3-tk
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+
+      # Verifies the whole dependency stack imports on this OS — the breakage
+      # most likely to differ across platforms (audio, ffmpeg, tray, tkinter).
+      - name: Import smoke test
+        run: >-
+          python -c "import sounddevice, av, numpy, PIL, pystray, plyer, faster_whisper, tkinter;
+          import xrapture.app, xrapture.widget, xrapture.audio_engine, xrapture.transcriber,
+          xrapture.progress, xrapture.filepicker, xrapture.paths, xrapture.settings;
+          import sys; print('import OK on', sys.platform)"
+
+      - name: Unit tests
+        run: python -m pytest -q

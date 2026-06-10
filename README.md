@@ -8,6 +8,9 @@ A cross-platform menu-bar app for capturing meetings (including the far end of
 online calls) and turning them into text with [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 Everything runs on your machine.
 
+[![CI](https://github.com/xkiwilabs/xRapture/actions/workflows/ci.yml/badge.svg)](https://github.com/xkiwilabs/xRapture/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 </div>
 
 ---
