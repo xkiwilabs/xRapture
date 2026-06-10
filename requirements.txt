@@ -1,0 +1,13 @@
+# Runtime + dev dependencies are declared in pyproject.toml.
+# For a development environment, install the package editable with the dev extras:
+#
+#     pip install -e ".[dev]"
+#
+# tkinter is required but is NOT pip-installable — install it for your platform:
+#     macOS (Homebrew):  brew install python-tk@3.13
+#     Debian/Ubuntu:     sudo apt install python3-tk
+#     (python.org installers already include it)
+#
+# Linux also needs PortAudio for sounddevice:  sudo apt install libportaudio2
+
+-e .[dev]

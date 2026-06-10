@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xrapture"
+version = "0.1.0"
+description = "Local menu-bar app that records mic + system audio and transcribes it with Whisper."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "xKiwiLabs" }]
+keywords = ["whisper", "transcription", "audio", "menu-bar", "meetings", "faster-whisper"]
+classifiers = [
+    "Environment :: MacOS X",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio :: Capture/Recording",
+]
+dependencies = [
+    "pystray>=0.19",
+    "sounddevice>=0.4",
+    "faster-whisper>=1.0",
+    "plyer>=2.1",
+    "Pillow>=10.0",
+    "numpy>=1.24",
+    'pyobjus>=1.2; sys_platform == "darwin"',
+]
+
+# tkinter is required but NOT pip-installable — see docs/installation.md:
+#   macOS (Homebrew): brew install python-tk@3.13   |   Debian/Ubuntu: apt install python3-tk
+
+[project.optional-dependencies]
+dev = ["pyinstaller>=6.0", "pytest>=7.0"]
+
+[project.scripts]
+xrapture = "xrapture.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/xkiwilabs/xRapture"
+Documentation = "https://github.com/xkiwilabs/xRapture/tree/main/docs"
+
+[tool.setuptools]
+packages = ["xrapture"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

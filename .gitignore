@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging / build output
+build/
+dist/
+*.spec.bak
+packaging/*.icns
+packaging/*.iconset/
+
+# User runtime data (settings live in the OS config dir, not the repo)
+settings.json
+
+# Whisper model cache (downloaded on first use)
+models/
+*.bin
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Internal dev artifacts — kept locally, excluded from the public repo
+CLAUDE.md
+docs/dev/
