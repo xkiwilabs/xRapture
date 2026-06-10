@@ -14,6 +14,7 @@ from xrapture.audio_engine import (  # noqa: E402
     LEVEL_FLOOR_DB,
     combine_tracks,
     db_to_fraction,
+    resolve_device,
     resolve_input_device,
     rms_db,
     write_wav,
@@ -43,6 +44,16 @@ def test_resolve_stale_index_falls_back():
 
 def test_resolve_valid_index_kept():
     assert resolve_input_device(4, DEVICES) == 4
+
+
+def test_resolve_device_generic_over_any_list():
+    # resolve_device works for any device list — e.g. Windows output devices
+    # used as the WASAPI loopback source.
+    outputs = [(0, "Speakers (Realtek)"), (1, "Headphones")]
+    assert resolve_device("Headphones", outputs) == 1
+    assert resolve_device("Speakers (Realtek)", outputs) == 0
+    assert resolve_device("Gone", outputs) is None
+    assert resolve_device(None, outputs) is None
 
 
 def test_rms_db_silence_hits_floor():

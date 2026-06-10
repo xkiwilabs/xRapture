@@ -25,9 +25,12 @@ particular is not pip-installable and must be present.
   | Debian / Ubuntu | `sudo apt install python3-tk` |
   | python.org installer | Already included |
 
-- **Linux only** — two extra system packages:
+- **Linux only** — extra system packages:
   - PortAudio for audio capture: `sudo apt install libportaudio2`
-  - A tray backend (AppIndicator): `libayatana-appindicator` (or your distro's equivalent)
+  - A tray backend: `sudo apt install gir1.2-ayatanaappindicator3-0.1`
+  - On **GNOME** (default Ubuntu), also enable the
+    [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/)
+    — otherwise the menu-bar icon won't appear.
 
 > Match your tkinter version to the Python you'll run xRapture with. If you use
 > Python 3.13, install `python-tk@3.13`.

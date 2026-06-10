@@ -21,7 +21,15 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
-from .audio_engine import AudioEngine, db_to_fraction, find_blackhole, list_input_devices
+from .audio_engine import (
+    AudioEngine,
+    db_to_fraction,
+    find_blackhole,
+    find_system_device,
+    list_input_devices,
+    list_system_capture_devices,
+    system_autodetect_label,
+)
 from .settings import load_settings
 
 # light, native-friendly palette
@@ -127,7 +135,7 @@ class MeterWidget:
         self._mic_var = tk.StringVar(
             value=self._label_for(self.settings.input_device, self._mic_choice, "System default"))
         self._system_var = tk.StringVar(
-            value=self._label_for(self.settings.system_device, self._sys_choice, "Auto-detect BlackHole"))
+            value=self._label_for(self.settings.system_device, self._sys_choice, system_autodetect_label()))
         self._layout_var = tk.StringVar(value=LAYOUTS[self.settings.track_layout])
         self._auto_var = tk.BooleanVar(value=self.settings.auto_transcribe)
         self._folder_var = tk.StringVar(value=str(Path(self.settings["output_folder"])))
@@ -150,9 +158,12 @@ class MeterWidget:
         # default/auto choice) because PortAudio indices shift across CoreAudio
         # reshuffles; names survive them.
         self._mic_choice = {"System default": None}
-        self._sys_choice = {"Auto-detect BlackHole": None}
         for _index, name in list_input_devices():
             self._mic_choice[name] = name
+        # The system-audio source list is OS-specific (output devices on Windows
+        # for loopback; input devices — BlackHole/monitor — on macOS/Linux).
+        self._sys_choice = {system_autodetect_label(): None}
+        for _index, name in list_system_capture_devices():
             self._sys_choice[name] = name
 
     @staticmethod
@@ -187,17 +198,25 @@ class MeterWidget:
     def _refresh_system_status(self) -> None:
         if not hasattr(self, "_sys_status"):
             return
-        if find_blackhole() is not None:
-            self._sys_status.configure(text="✓ BlackHole detected", fg="#2fa84f")
+        if find_system_device() is not None:
+            self._sys_status.configure(text="✓ system audio ready", fg="#2fa84f")
         else:
-            self._sys_status.configure(text="No loopback device — click Set up", fg=MUTED)
+            self._sys_status.configure(text="No system-audio source — click Set up", fg=MUTED)
 
     def _open_audio_setup(self) -> None:
+        if sys.platform == "win32":
+            messagebox.showinfo(
+                "Set up system audio",
+                "Windows captures system audio with WASAPI loopback — no extra setup.\n\n"
+                "Set 'System' above to the output device you want to capture (usually "
+                "your speakers/headphones), or leave it on auto-detect.")
+            return
         if sys.platform != "darwin":
             messagebox.showinfo(
                 "Set up system audio",
-                "Windows captures system audio automatically (WASAPI loopback).\n\n"
-                "Linux: pick your PulseAudio '.monitor' source as the System device.")
+                "On Linux, pick your PulseAudio/PipeWire '.monitor' source as the "
+                "System device above (e.g. 'Monitor of Built-in Audio'). Auto-detect "
+                "finds one if its name contains 'monitor'.")
             return
         # PLATFORM: Audio MIDI Setup is the macOS tool for Multi-Output Devices.
         subprocess.run(["open", "-a", "Audio MIDI Setup"], check=False)

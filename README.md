@@ -57,11 +57,16 @@ needs a one-time setup, because macOS has no built-in way to record its own outp
 
 - **macOS** — install [BlackHole](https://github.com/ExistentialAudio/BlackHole) and
   route output through a Multi-Output Device.
-- **Windows** — works natively (WASAPI loopback), no setup.
-- **Linux** — select your PulseAudio `.monitor` source.
+- **Windows** — works natively via WASAPI loopback; just pick an output device (no
+  virtual device needed).
+- **Linux** — select your PulseAudio/PipeWire `.monitor` source.
 
 Full walkthrough: **[System Audio Setup](docs/system-audio-setup.md)**. Without it,
 xRapture records mic-only and the System meter shows "no device" — nothing breaks.
+
+> **Platform status:** developed and tested on **macOS**. Windows and Linux are
+> supported from the same codebase (install via `pip`) but are **less battle-tested** —
+> bug reports welcome.
 
 ## Documentation
 

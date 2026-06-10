@@ -69,17 +69,33 @@ meter move. If it does, you're set.
 
 ## Windows
 
-System audio works **natively** via WASAPI loopback — no extra setup. xRapture captures
-your default playback device's output.
+No virtual device needed. xRapture uses **WASAPI loopback** to capture whatever an
+**output device** is playing.
+
+- Leave **System** on **"Auto-detect (system output)"** to capture your default
+  playback device, **or** pick a specific output (e.g. *Speakers* / *Headphones*)
+  from the **System** dropdown in the widget's settings.
+- Play some audio and watch the **System** meter move.
+
+> Windows support is implemented but **less battle-tested than macOS**. If loopback
+> fails to open, the meter shows "no device" and xRapture keeps recording mic-only —
+> please open an issue with your device details.
 
 ## Linux
 
-Pick your **PulseAudio `.monitor` source** as the System device (in the widget's
-settings, set `system_device` to the monitor source's name). PulseAudio exposes a
-`.monitor` source for each output, which mirrors what's playing.
+Each output has a **`.monitor` source** (PulseAudio/PipeWire) that mirrors what's
+playing — that's the system-audio tap.
 
-Make sure you've also installed the Linux prerequisites from the
-[Installation guide](installation.md#prerequisites) (PortAudio + a tray backend).
+- Leave **System** on **"Auto-detect (monitor)"** (xRapture picks a source whose name
+  contains *monitor*), **or** choose your monitor source (e.g. *Monitor of Built-in
+  Audio*) from the **System** dropdown.
+- Install the Linux prerequisites from the
+  [Installation guide](installation.md#prerequisites) — PortAudio **and** a tray
+  backend. On GNOME (default Ubuntu), the menu-bar icon needs the
+  [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/)
+  plus `gir1.2-ayatanaappindicator3-0.1`, or the tray icon won't appear.
+
+> Linux support is implemented but **less battle-tested than macOS**.
 
 ## Troubleshooting
 
@@ -90,7 +106,9 @@ xRapture couldn't find a loopback device at startup.
 - **macOS:** Is BlackHole installed (`brew list blackhole-2ch`)? If you installed it
   while xRapture was running, use **Quit & Relaunch** — devices are only detected at
   startup.
-- **Linux:** Is a PulseAudio `.monitor` source selected as `system_device`?
+- **Windows:** Pick an output device as **System** (or auto-detect). If it still
+  fails, your default output may not be a WASAPI endpoint — choose a specific one.
+- **Linux:** Is a PulseAudio/PipeWire `.monitor` source selected as `system_device`?
 - This is non-fatal — xRapture still records mic-only.
 
 ### Meter stays flat (no device error, but no level)

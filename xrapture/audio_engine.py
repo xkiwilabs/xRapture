@@ -15,12 +15,15 @@ require PortAudio to be present.
 
 from __future__ import annotations
 
+import sys
 import threading
 import wave
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+
+IS_WINDOWS = sys.platform == "win32"
 
 # 48 kHz mono per source: the common CoreAudio rate that both typical mics and
 # BlackHole accept, so the two streams share a rate and combine without resampling.
@@ -125,10 +128,90 @@ def list_input_devices() -> list[tuple[int, str]]:
     return devices
 
 
+def list_output_devices() -> list[tuple[int, str]]:
+    """Return ``(index, name)`` for output devices usable as a loopback source.
+
+    On Windows we restrict to WASAPI render endpoints, since loopback capture is a
+    WASAPI feature; elsewhere this lists all output devices (informational).
+    """
+    import sounddevice as sd
+
+    wasapi = _wasapi_hostapi_index() if IS_WINDOWS else None
+    devices = []
+    for index, info in enumerate(sd.query_devices()):
+        if info["max_output_channels"] > 0 and (wasapi is None or info["hostapi"] == wasapi):
+            devices.append((index, info["name"]))
+    return devices
+
+
+def _wasapi_hostapi_index() -> int | None:
+    """Index of the WASAPI host API (Windows only), or None."""
+    import sounddevice as sd
+
+    for index, hostapi in enumerate(sd.query_hostapis()):
+        if "wasapi" in hostapi["name"].lower():
+            return index
+    return None
+
+
+def list_system_capture_devices() -> list[tuple[int, str]]:
+    """Devices selectable as the system-audio source on this OS.
+
+    Windows captures an **output** device via WASAPI loopback; macOS/Linux capture
+    an **input** device (BlackHole, or a PulseAudio/PipeWire ``.monitor`` source).
+    """
+    return list_output_devices() if IS_WINDOWS else list_input_devices()
+
+
 def find_blackhole() -> int | None:
     """Return the index of a BlackHole-style loopback device, if present."""
     for index, name in list_input_devices():
         if "blackhole" in name.lower():
+            return index
+    return None
+
+
+def find_system_device() -> int | None:
+    """Auto-detected system-audio source index for this OS, or None.
+
+    Windows → the WASAPI default output (loopback). macOS → BlackHole. Linux → a
+    ``.monitor`` input source if one is present.
+    """
+    if IS_WINDOWS:
+        import sounddevice as sd
+
+        wasapi = _wasapi_hostapi_index()
+        if wasapi is not None:
+            default = sd.query_hostapis(wasapi).get("default_output_device", -1)
+            if isinstance(default, int) and default >= 0:
+                return default
+        return None
+    blackhole = find_blackhole()
+    if blackhole is not None:
+        return blackhole
+    for index, name in list_input_devices():  # PulseAudio/PipeWire monitor source
+        if "monitor" in name.lower():
+            return index
+    return None
+
+
+def system_autodetect_label() -> str:
+    """Human label for the 'auto-detect' system-audio choice on this OS."""
+    if IS_WINDOWS:
+        return "Auto-detect (system output)"
+    if sys.platform == "darwin":
+        return "Auto-detect BlackHole"
+    return "Auto-detect (monitor)"
+
+
+def resolve_device(value, devices):
+    """Resolve a stored device (name / legacy index / None) against ``devices``."""
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value if any(i == value for i, _ in devices) else None
+    for index, name in devices:
+        if name == value:
             return index
     return None
 
@@ -142,25 +225,18 @@ def resolve_input_device(value, devices=None):
     index or an unplugged device name resolves to ``None`` rather than erroring —
     device indices are NOT stable, which is why names are preferred.
     """
-    if value is None:
-        return None
     if devices is None:
         devices = list_input_devices()
-    if isinstance(value, int):
-        return value if any(i == value for i, _ in devices) else None
-    for index, name in devices:
-        if name == value:
-            return index
-    return None
+    return resolve_device(value, devices)
 
 
-def _input_channels(device, default: int = 1, cap: int = 2) -> int:
-    """Channels to open for ``device``, clamped to ``cap`` (1 mic / 2 system)."""
+def _device_channels(device, kind: str = "input", default: int = 1, cap: int = 2) -> int:
+    """Channels to open for ``device`` (``kind`` = input/output), clamped to ``cap``."""
     import sounddevice as sd
 
     try:
-        info = sd.query_devices(device, "input")
-        return max(1, min(int(info["max_input_channels"]), cap))
+        info = sd.query_devices(device)
+        return max(1, min(int(info[f"max_{kind}_channels"]), cap))
     except Exception:
         return default
 
@@ -259,14 +335,25 @@ class AudioEngine:
                 self.last_error = f"mic device unavailable: {exc}"
                 print(f"[audio_engine] {self.last_error}")
 
-        # System — null means auto-detect BlackHole; otherwise resolve the saved name.
+        # System audio. The source differs by OS: Windows captures an output device
+        # via WASAPI loopback; macOS/Linux capture an input device (BlackHole /
+        # monitor source). null means auto-detect; otherwise resolve the saved name.
+        sys_devices = list_system_capture_devices()
         sysval = self.settings.system_device
-        device = find_blackhole() if sysval is None else resolve_input_device(sysval, devices)
+        device = find_system_device() if sysval is None else resolve_device(sysval, sys_devices)
         if device is not None and not self._system.is_open:
-            channels = _input_channels(device, default=2, cap=2)
             try:
+                if IS_WINDOWS:
+                    # PLATFORM: Windows WASAPI loopback — record what an output device
+                    # plays. auto_convert lets us request 48 kHz regardless of the
+                    # device's mix format, keeping it aligned with the mic stream.
+                    extra = sd.WasapiSettings(loopback=True, auto_convert=True)
+                    channels = _device_channels(device, "output", default=2, cap=2)
+                else:
+                    extra = None
+                    channels = _device_channels(device, "input", default=2, cap=2)
                 self._system.channels = channels
-                self._system.open(sd, device, self._on_system)
+                self._system.open(sd, device, self._on_system, extra_settings=extra)
                 self.system_available = True
                 self.last_error = None
             except Exception as exc:
@@ -311,13 +398,14 @@ class _Source:
     def is_open(self) -> bool:
         return self._stream is not None
 
-    def open(self, sd, device, callback) -> None:
+    def open(self, sd, device, callback, extra_settings=None) -> None:
         self._stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
             channels=self.channels,
             dtype="int16",
             device=device,
             callback=callback,
+            extra_settings=extra_settings,  # WASAPI loopback on Windows
         )
         self._stream.start()
 
