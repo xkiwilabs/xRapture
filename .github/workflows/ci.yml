@@ -23,11 +23,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # Linux needs PortAudio (for sounddevice) and Tk system libs; macOS and
-      # Windows get both bundled with the Python build.
+      # Linux needs PortAudio for sounddevice; macOS/Windows bundle it in the wheel.
       - name: Install Linux system libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libportaudio2 python3-tk
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
 
       - name: Install package
         run: |
@@ -35,14 +34,23 @@ jobs:
           pip install -e .
           pip install pytest
 
-      # Verifies the whole dependency stack imports on this OS — the breakage
-      # most likely to differ across platforms (audio, ffmpeg, tray, tkinter).
-      - name: Import smoke test
+      # The core/audio stack must import on every OS — this is the breakage most
+      # likely to differ across platforms (audio capture, ffmpeg, ctranslate2).
+      - name: Core import smoke
         run: >-
-          python -c "import sounddevice, av, numpy, PIL, pystray, plyer, faster_whisper, tkinter;
-          import xrapture.app, xrapture.widget, xrapture.audio_engine, xrapture.transcriber,
-          xrapture.progress, xrapture.filepicker, xrapture.paths, xrapture.settings;
-          import sys; print('import OK on', sys.platform)"
+          python -c "import sounddevice, av, numpy, PIL, plyer, faster_whisper;
+          import xrapture.audio_engine, xrapture.transcriber, xrapture.settings, xrapture.paths;
+          import sys; print('core import OK on', sys.platform)"
+
+      # tkinter + pystray need a desktop GUI stack that headless Linux runners
+      # lack (and setup-python doesn't bundle tkinter on Linux). They're exercised
+      # on macOS and Windows, which is representative of a real desktop.
+      - name: GUI import smoke (macOS + Windows)
+        if: runner.os != 'Linux'
+        run: >-
+          python -c "import tkinter, pystray;
+          import xrapture.app, xrapture.widget, xrapture.progress, xrapture.filepicker;
+          print('gui import OK')"
 
       - name: Unit tests
         run: python -m pytest -q
